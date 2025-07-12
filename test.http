@@ -1,0 +1,11 @@
+###
+GET http://localhost:5000/api/heading
+
+
+###
+POST http://localhost:5000/api/heading
+Content-Type: application/json
+
+{
+  "text": "Hyper boost your Revenue Management, Marketing and Commercial Functions with Business Ready AI"
+}
