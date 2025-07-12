@@ -1,61 +1,60 @@
-
+// server.js - Brynk Labs Assignment Backend using better-sqlite3
 
 const express = require('express');
 const cors = require('cors');
-const sqlite3 = require('sqlite3').verbose();
 const bodyParser = require('body-parser');
+const Database = require('better-sqlite3');
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(bodyParser.json());
 
-// 3️⃣ Setup SQLite DB
-const db = new sqlite3.Database('./heading.db', (err) => {
-  if (err) console.error('Error opening database', err);
-  else console.log('✅ Connected to SQLite database');
-});
+// Setup SQLite using better-sqlite3
+const db = new Database('./heading.db');
+db.prepare(`
+    CREATE TABLE IF NOT EXISTS heading (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        text TEXT
+    )
+`).run();
+console.log('✅ Connected to SQLite database');
 
-// Create table if not exists
-const initQuery = `CREATE TABLE IF NOT EXISTS heading (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  text TEXT
-)`;
-db.run(initQuery);
-
-// 4️⃣ GET API to fetch heading
+// GET API to fetch the latest heading
 app.get('/api/heading', (req, res) => {
-  db.get('SELECT text FROM heading ORDER BY id DESC LIMIT 1', [], (err, row) => {
-    if (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Database error' });
-    } else {
-      res.json({ heading: row ? row.text : "Default heading not set yet." });
+    try {
+        const row = db.prepare('SELECT text FROM heading ORDER BY id DESC LIMIT 1').get();
+        res.json({ heading: row ? row.text : 'Default heading not set yet.' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Database error' });
     }
-  });
 });
 
-// 5️⃣ POST API to save heading
+// POST API to save a new heading
 app.post('/api/heading', (req, res) => {
-  const { text } = req.body;
-  if (!text || text.trim() === '') {
-    return res.status(400).json({ error: 'Heading text is required' });
-  }
+    const { text } = req.body;
 
-  const insertQuery = 'INSERT INTO heading (text) VALUES (?)';
-  db.run(insertQuery, [text], function (err) {
-    if (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Database error while inserting' });
-    } else {
-      res.json({ success: true, message: 'Heading updated successfully', id: this.lastID });
+    if (!text || text.trim() === '') {
+        return res.status(400).json({ error: 'Heading text is required' });
     }
-  });
+
+    try {
+        const stmt = db.prepare('INSERT INTO heading (text) VALUES (?)');
+        const info = stmt.run(text);
+        res.json({
+            success: true,
+            message: 'Heading saved successfully',
+            id: info.lastInsertRowid
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Database error while inserting' });
+    }
 });
 
-// 6️⃣ Start server
+// Start the server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
-
